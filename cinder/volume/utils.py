@@ -37,6 +37,9 @@ volume_opts = [
                default='1M',
                help='The default block size used when copying/clearing '
                     'volumes'),
+    cfg.BoolOpt('use_lightweight_copy_for_clone_volume',
+               default=False,
+               help='Use light weight copy to clone volume for Btrfs/OCFS2'),
 ]
 
 CONF = cfg.CONF
@@ -193,7 +196,11 @@ def copy_volume(srcstr, deststr, size_in_m, sync=False,
     blocksize, count = _calculate_count(size_in_m)
 
     # Perform the copy
-    execute('dd', 'if=%s' % srcstr, 'of=%s' % deststr,
-            'count=%d' % count,
-            'bs=%s' % blocksize,
-            *extra_flags, run_as_root=True)
+    if CONF.use_lightweight_copy_for_clone_volume:
+        execute('cp', '--reflink', srcstr, deststr, run_as_root=True)
+    else:
+        blocksize = CONF.volume_dd_blocksize
+        execute('dd', 'if=%s' % srcstr, 'of=%s' % deststr,
+                'count=%d' % count,
+                'bs=%s' % blocksize,
+                *extra_flags, run_as_root=True)
